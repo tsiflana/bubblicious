@@ -35,7 +35,7 @@ typedef long int s32int;
 
 const u32int dither_frequency  = 30000;  //hz
 
-const double mm_per_step = 0.005; // TODO Calibrate
+const double mm_per_step = 1/800;
 
 
 int step_ticker_1 = 0;
@@ -199,6 +199,53 @@ void do_output(double value)
   analogWrite(OUTPUT_PIN, PWM_FROM_VOLTAGE(value));
 }
 
+
+// Storage
+
+const int over_sample = 10;
+const int storage_length = 65;
+long int positions[65];
+int position_pointer = 0;
+
+unsigned int get_mod_pointer (int pointer)
+{
+  while (pointer < 0)
+    pointer += storage_length;
+    
+  return pointer % storage_length;
+}
+
+void initialise_averaging(void)
+{
+  for (int x = 0; x < storage_length; x++)
+   positions[x] = 0; 
+}
+
+void store (long int value)
+{
+  positions[position_pointer] = value;
+  position_pointer = get_mod_pointer(position_pointer + 1);
+}
+
+long int get_average(int start_pointer, int end_pointer)
+{
+  int total = 0;
+  for (int x = start_pointer; x < end_pointer; x++)
+    total += positions[x];
+    
+  return total/over_sample;
+}
+
+double get_moved(void)
+{
+  long int end_point = get_average(position_pointer - over_sample, position_pointer);
+ 
+  long int start_point = get_average(position_pointer, position_pointer + over_sample);
+  
+  return (end_point - start_point);
+}
+
+
 void setup() {
 
   // Configure outputs
@@ -228,7 +275,7 @@ void setup() {
   delay(1000);
 
 
-set_rate_1(-max_speed);//
+  set_rate_1(-max_speed);//
 
 
   while (!digitalRead(LIMIT_0))
@@ -241,7 +288,7 @@ set_rate_1(-max_speed);//
 
 
 
-  Serial.begin(57600);
+  Serial.begin(9600);
 }
 
 void hunt ()
@@ -271,7 +318,8 @@ void hunt ()
     set_rate_1(0);
     mode = TRACKING;
     new_track = 1;
-  }
+  }  
+
 }
 
 void track()
@@ -329,7 +377,10 @@ void loop() {
        break;
      default:
        set_rate_1(0);
+
   }
+
+
   
   /// TOOD check for timeout
 }
